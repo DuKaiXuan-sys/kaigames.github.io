@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>方块消除解压游戏</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #111;
+            cursor: none;
+            font-family: Arial, sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+        
+        #gameCanvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 10;
+        }
+        
+        #startScreen h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            color: #fff;
+            text-shadow: 0 0 10px #7af, 0 0 20px #7af, 0 0 30px #7af;
+        }
+        
+        #startButton {
+            padding: 15px 30px;
+            font-size: 1.5em;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        #startButton:hover {
+            background-color: #2980b9;
+            transform: scale(1.05);
+        }
+        
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            z-index: 5;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            font-size: 16px;
+            z-index: 5;
+        }
+        
+        .power-up {
+            position: absolute;
+            bottom: 70px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 5;
+        }
+        
+        .power-up-item {
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .power-up-item:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .power-up-item.active {
+            background-color: rgba(52, 152, 219, 0.7);
+            box-shadow: 0 0 10px #3498db;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="score">得分: 0</div>
+    
+    <div id="instructions">
+        鼠标移动控制准星 | 左键点击发射子弹 | 消除方块得分
+    </div>
+    
+    <div class="power-up">
+        <div class="power-up-item" id="explosionPower" title="爆炸效果">爆</div>
+        <div class="power-up-item" id="laserPower" title="激光效果">激</div>
+        <div class="power-up-item" id="bouncePower" title="弹跳效果">弹</div>
+    </div>
+    
+    <div id="startScreen">
+        <h1>方块消除解压游戏</h1>
+        <p>移动鼠标瞄准，点击左键发射子弹消除方块</p>
+        <p>享受这个放松心情的解压游戏吧！</p>
+        <button id="startButton">开始游戏</button>
+    </div>
+
+    <script>
+        // 获取画布和上下文
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 设置画布大小为窗口大小
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        
+        // 初始调整画布大小并监听窗口变化
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // 游戏状态
+        let gameActive = false;
+        let score = 0;
+        let blocks = [];
+        let bullets = [];
+        let particles = [];
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        // 中心球参数
+        const centralBall = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 15,
+            color: '#ffffff',
+            glowRadius: 30
+        };
+        
+        // 准星参数
+        const crosshair = {
+            size: 20,
+            lineWidth: 2,
+            color: '#ffffff'
+        };
+        
+        // 方块参数
+        const blockConfig = {
+            minSize: 20,
+            maxSize: 50,
+            minSpeed: 0.2,
+            maxSpeed: 1.2,
+            spawnRate: 0.05,
+            maxBlocks: 100
+        };
+        
+        // 子弹参数
+        const bulletConfig = {
+            radius: 5,
+            speed: 10,
+            color: '#ffffff',
+            cooldown: 150,
+            lastFired: 0
+        };
+        
+        // 粒子效果参数
+        const particleConfig = {
+            count: 15,
+            speed: 3,
+            decay: 0.95,
+            size: 3
+        };
+        
+        // 特效模式
+        const powerUps = {
+            explosion: false,
+            laser: false,
+            bounce: false
+        };
+        
+        // 游戏开始
+        document.getElementById('startButton').addEventListener('click', startGame);
+        
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            gameActive = true;
+            score = 0;
+            updateScore();
+            blocks = [];
+            bullets = [];
+            particles = [];
+            animate();
+        }
+        
+        // 特效按钮点击事件
+        document.getElementById('explosionPower').addEventListener('click', () => togglePowerUp('explosion'));
+        document.getElementById('laserPower').addEventListener('click', () => togglePowerUp('laser'));
+        document.getElementById('bouncePower').addEventListener('click', () => togglePowerUp('bounce'));
+        
+        function togglePowerUp(power) {
+            // 切换特效状态
+            powerUps[power] = !powerUps[power];
+            
+            // 更新UI显示
+            const element = document.getElementById(power + 'Power');
+            if (powerUps[power]) {
+                element.classList.add('active');
+            } else {
+                element.classList.remove('active');
+            }
+        }
+        
+        // 鼠标移动事件
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+        
+        // 移动端触摸事件
+        window.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            mouseX = e.touches[0].clientX;
+            mouseY = e.touches[0].clientY;
+        }, { passive: false });
+        
+        // 鼠标点击发射子弹
+        window.addEventListener('mousedown', (e) => {
+            if (!gameActive) return;
+            if (e.button === 0) { // 左键
+                fireBullet();
+            }
+        });
+        
+        // 移动端点击发射子弹
+        window.addEventListener('touchstart', (e) => {
+            if (!gameActive) return;
+            fireBullet();
+        });
+        
+        // 发射子弹
+        function fireBullet() {
+            const now = Date.now();
+            if (now - bulletConfig.lastFired < bulletConfig.cooldown) return;
+            
+            bulletConfig.lastFired = now;
+            
+            const angle = Math.atan2(mouseY - centralBall.y, mouseX - centralBall.x);
+            
+            if (powerUps.laser) {
+                // 激光模式直接命中准星位置
+                createLaserEffect(mouseX, mouseY);
+                checkBlockHits(mouseX, mouseY, 30);
+            } else {
+                // 普通子弹
+                bullets.push({
+                    x: centralBall.x,
+                    y: centralBall.y,
+                    vx: Math.cos(angle) * bulletConfig.speed,
+                    vy: Math.sin(angle) * bulletConfig.speed,
+                    radius: bulletConfig.radius,
+                    color: bulletConfig.color,
+                    bounced: 0,
+                    maxBounces: powerUps.bounce ? 3 : 0
+                });
+            }
+            
+            // 添加后坐力效果
+            createParticles(centralBall.x, centralBall.y, 10, {
+                vx: -Math.cos(angle) * 2,
+                vy: -Math.sin(angle) * 2
+            });
+        }
+        
+        // 创建激光效果
+        function createLaserEffect(targetX, targetY) {
+            const angle = Math.atan2(targetY - centralBall.y, targetX - centralBall.x);
+            
+            for (let i = 0; i < 50; i++) {
+                const distance = i * 10;
+                const x = centralBall.x + Math.cos(angle) * distance;
+                const y = centralBall.y + Math.sin(angle) * distance;
+                
+                if (distance > Math.sqrt(Math.pow(targetX - centralBall.x, 2) + Math.pow(targetY - centralBall.y, 2))) {
+                    break;
+                }
+                
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 2,
+                    size: 2 + Math.random() * 3,
+                    color: `hsl(${Math.random() * 60 + 180}, 100%, 70%)`,
+                    life: 1,
+                    decay: 0.92
+                });
+            }
+        }
+        
+        // 生成方块
+        function spawnBlock() {
+            if (blocks.length >= blockConfig.maxBlocks) return;
+            
+            if (Math.random() < blockConfig.spawnRate) {
+                // 确定生成位置（屏幕外）
+                let x, y;
+                const side = Math.floor(Math.random() * 4);
+                const size = blockConfig.minSize + Math.random() * (blockConfig.maxSize - blockConfig.minSize);
+                
+                switch (side) {
+                    case 0: // 上方
+                        x = Math.random() * canvas.width;
+                        y = -size;
+                        break;
+                    case 1: // 右方
+                        x = canvas.width + size;
+                        y = Math.random() * canvas.height;
+                        break;
+                    case 2: // 下方
+                        x = Math.random() * canvas.width;
+                        y = canvas.height + size;
+                        break;
+                    case 3: // 左方
+                        x = -size;
+                        y = Math.random() * canvas.height;
+                        break;
+                }
+                
+                // 确定移动方向（朝向中心点）
+                const angle = Math.atan2(centralBall.y - y, centralBall.x - x);
+                const speed = blockConfig.minSpeed + Math.random() * (blockConfig.maxSpeed - blockConfig.minSpeed);
+                const vx = Math.cos(angle) * speed;
+                const vy = Math.sin(angle) * speed;
+                
+                // 随机颜色
+                const hue = Math.floor(Math.random() * 360);
+                const saturation = 70 + Math.floor(Math.random() * 30);
+                const lightness = 40 + Math.floor(Math.random() * 20);
+                
+                blocks.push({
+                    x, y, vx, vy, size,
+                    color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+                    rotation: 0,
+                    rotationSpeed: (Math.random() - 0.5) * 0.1,
+                    health: 1 + Math.floor(Math.random() * 3)
+                });
+            }
+        }
+        
+        // 创建爆炸粒子
+        function createParticles(x, y, count, velocityOverride = null) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * particleConfig.speed;
+                
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: velocityOverride ? velocityOverride.vx + (Math.random() - 0.5) : Math.cos(angle) * speed,
+                    vy: velocityOverride ? velocityOverride.vy + (Math.random() - 0.5) : Math.sin(angle) * speed,
+                    size: Math.random() * particleConfig.size + 1,
+                    color: `hsl(${Math.random() * 60 + 180}, 100%, 70%)`,
+                    life: 1,
+                    decay: particleConfig.decay
+                });
+            }
+        }
+        
+        // 检查方块是否被击中
+        function checkBlockHits(x, y, radius) {
+            for (let i = blocks.length - 1; i >= 0; i--) {
+                const block = blocks[i];
+                
+                // 检查碰撞
+                if (x + radius > block.x - block.size/2 &&
+                    x - radius < block.x + block.size/2 &&
+                    y + radius > block.y - block.size/2 &&
+                    y - radius < block.y + block.size/2) {
+                    
+                    // 减少方块生命值
+                    block.health--;
+                    
+                    // 如果生命值为0，移除方块并增加分数
+                    if (block.health <= 0) {
+                        // 创建粒子效果
+                        createParticles(block.x, block.y, particleConfig.count * 2);
+                        
+                        // 爆炸特效
+                        if (powerUps.explosion) {
+                            explosionEffect(block.x, block.y);
+                        }
+                        
+                        // 移除方块
+                        blocks.splice(i, 1);
+                        
+                        // 增加分数
+                        score += 10;
+                        updateScore();
+                    } else {
+                        // 如果方块还有生命，改变颜色
+                        const hue = block.color.match(/hsl\((\d+)/)[1];
+                        block.color = `hsl(${hue}, 100%, ${20 + block.health * 20}%)`;
+                        
+                        // 添加被击中效果
+                        createParticles(x, y, 5);
+                    }
+                }
+            }
+        }
+        
+        // 爆炸效果
+        function explosionEffect(x, y) {
+            const radius = 100;
+            
+            // 爆炸影响范围内的方块
+            for (let i = blocks.length - 1; i >= 0; i--) {
+                const block = blocks[i];
+                const distance = Math.sqrt(Math.pow(block.x - x, 2) + Math.pow(block.y - y, 2));
+                
+                if (distance < radius + block.size) {
+                    // 创建爆炸粒子
+                    createParticles(block.x, block.y, particleConfig.count);
+                    
+                    // 移除方块
+                    blocks.splice(i, 1);
+                    
+                    // 增加分数
+                    score += 5;
+                    updateScore();
+                }
+            }
+            
+            // 爆炸视觉效果
+            for (let i = 0; i < 50; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * radius;
+                
+                particles.push({
+                    x: x + Math.cos(angle) * distance,
+                    y: y + Math.sin(angle) * distance,
+                    vx: Math.cos(angle) * (1 + Math.random() * 3),
+                    vy: Math.sin(angle) * (1 + Math.random() * 3),
+                    size: 2 + Math.random() * 4,
+                    color: `hsl(${Math.random() * 60}, 100%, 60%)`,
+                    life: 1,
+                    decay: 0.96
+                });
+            }
+        }
+        
+        // 更新分数显示
+        function updateScore() {
+            document.getElementById('score').textContent = `得分: ${score}`;
+        }
+        
+        // 动画循环
+        function animate() {
+            if (!gameActive) return;
+            
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 更新中心球位置
+            centralBall.x = canvas.width / 2;
+            centralBall.y = canvas.height / 2;
+            
+            // 绘制背景
+            drawBackground();
+            
+            // 生成新方块
+            spawnBlock();
+            
+            // 更新和绘制方块
+            updateBlocks();
+            
+            // 更新和绘制子弹
+            updateBullets();
+            
+            // 更新和绘制粒子
+            updateParticles();
+            
+            // 绘制中心球
+            drawCentralBall();
+            
+            // 绘制准星
+            drawCrosshair();
+            
+            // 请求下一帧
+            requestAnimationFrame(animate);
+        }
+        
+        // 绘制背景
+        function drawBackground() {
+            // 创建渐变背景
+            const gradient = ctx.createRadialGradient(
+                centralBall.x, centralBall.y, 0,
+                centralBall.x, centralBall.y, canvas.width / 1.5
+            );
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(1, '#0f0f1a');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制背景网格
+            ctx.strokeStyle = 'rgba(52, 152, 219, 0.1)';
+            ctx.lineWidth = 1;
+            
+            const gridSize = 50;
+            const offsetX = centralBall.x % gridSize;
+            const offsetY = centralBall.y % gridSize;
+            
+            // 水平线
+            for (let y = offsetY; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // 垂直线
+            for (let x = offsetX; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+        }
+        
+        // 绘制中心球
+        function drawCentralBall() {
+            // 绘制光晕
+            const gradient = ctx.createRadialGradient(
+                centralBall.x, centralBall.y, centralBall.radius / 2,
+                centralBall.x, centralBall.y, centralBall.glowRadius
+            );
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(centralBall.x, centralBall.y, centralBall.glowRadius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 绘制球体
+            ctx.fillStyle = centralBall.color;
+            ctx.beginPath();
+            ctx.arc(centralBall.x, centralBall.y, centralBall.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 绘制光泽效果
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.beginPath();
+            ctx.arc(centralBall.x - centralBall.radius/3, centralBall.y - centralBall.radius/3, centralBall.radius/3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // 绘制准星
+        function drawCrosshair() {
+            ctx.strokeStyle = crosshair.color;
+            ctx.lineWidth = crosshair.lineWidth;
+            
+            // 十字准星
+            ctx.beginPath();
+            // 水平线
+            ctx.moveTo(mouseX - crosshair.size, mouseY);
+            ctx.lineTo(mouseX + crosshair.size, mouseY);
+            // 垂直线
+            ctx.moveTo(mouseX, mouseY - crosshair.size);
+            ctx.lineTo(mouseX, mouseY + crosshair.size);
+            ctx.stroke();
+            
+            // 外圈
+            ctx.beginPath();
+            ctx.arc(mouseX, mouseY, crosshair.size * 1.5, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // 中心点
+            ctx.fillStyle = crosshair.color;
+            ctx.beginPath();
+            ctx.arc(mouseX, mouseY, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // 更新和绘制方块
+        function updateBlocks() {
+            for (let i = blocks.length - 1; i >= 0; i--) {
+                const block = blocks[i];
+                
+                // 更新位置
+                block.x += block.vx;
+                block.y += block.vy;
+                
+                // 更新旋转
+                block.rotation += block.rotationSpeed;
+                
+                // 检查是否需要移除（离中心太远）
+                const distanceToCenter = Math.sqrt(
+                    Math.pow(block.x - centralBall.x, 2) + 
+                    Math.pow(block.y - centralBall.y, 2)
+                );
+                
+                if (distanceToCenter > Math.max(canvas.width, canvas.height) * 1.5) {
+                    blocks.splice(i, 1);
+                    continue;
+                }
+                
+                // 绘制方块
+                ctx.save();
+                ctx.translate(block.x, block.y);
+                ctx.rotate(block.rotation);
+                
+                ctx.fillStyle = block.color;
+                ctx.fillRect(-block.size / 2, -block.size / 2, block.size, block.size);
+                
+                // 绘制方块边框
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-block.size / 2, -block.size / 2, block.size, block.size);
+                
+                // 如果方块有多个生命值，显示生命值
+                if (block.health > 1) {
+                    ctx.fillStyle = 'white';
+                    ctx.font = `${block.size / 3}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(block.health, 0, 0);
+                }
+                
+                ctx.restore();
+            }
+        }
+        
+        // 更新和绘制子弹
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                
+                // 更新位置
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+                
+                // 检查子弹是否超出屏幕
+                if (bullet.x < -bullet.radius || 
+                    bullet.x > canvas.width + bullet.radius || 
+                    bullet.y < -bullet.radius || 
+                    bullet.y > canvas.height + bullet.radius) {
+                    
+                    // 如果启用了弹跳且未达到最大弹跳次数，则让子弹弹回
+                    if (powerUps.bounce && bullet.bounced < bullet.maxBounces) {
+                        // 确定子弹碰到的是哪个边界，然后反弹
+                        if (bullet.x < -bullet.radius || bullet.x > canvas.width + bullet.radius) {
+                            bullet.vx = -bullet.vx;
+                        } else {
+                            bullet.vy = -bullet.vy;
+                        }
+                        
+                        // 将子弹拉回屏幕内
+                        bullet.x = Math.max(bullet.radius, Math.min(canvas.width - bullet.radius, bullet.x));
+                        bullet.y = Math.max(bullet.radius, Math.min(canvas.height - bullet.radius, bullet.y));
+                        
+                        bullet.bounced++;
+                        
+                        // 创建反弹效果
+                        createParticles(bullet.x, bullet.y, 10);
+                    } else {
+                        // 否则移除子弹
+                        bullets.splice(i, 1);
+                        continue;
+                    }
+                }
+                
+                // 检查子弹是否击中方块
+                checkBlockHits(bullet.x, bullet.y, bullet.radius);
+                
+                // 绘制子弹
+                ctx.fillStyle = bullet.color;
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // 绘制子弹拖尾效果
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(bullet.x, bullet.y);
+                ctx.lineTo(bullet.x - bullet.vx * 3, bullet.y - bullet.vy * 3);
+                ctx.stroke();
+            }
+        }
+        
+        // 更新和绘制粒子
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                
+                // 更新位置
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                
+                // 更新生命周期
+                particle.life *= particle.decay;
+                
+                // 如果粒子生命周期结束，移除它
+                if (particle.life < 0.01) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                
+                // 绘制粒子
+                ctx.globalAlpha = particle.life;
+                ctx.fillStyle = particle.color || 'white';
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size * particle.life, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+    </script>
+</body>
+</html>
