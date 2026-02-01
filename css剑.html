@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>剑气划痕 - Canvas版</title>
+<style>
+  body { margin:0; overflow:hidden; background:#000; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<script>
+// 核心参数可调
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+window.addEventListener('resize', () => {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+});
+
+let lastX, lastY;
+const trails = [];
+
+class Trail {
+  constructor(x, y, angle) {
+    this.x = x;
+    this.y = y;
+    this.angle = angle;
+    this.life = 130;           // 持续帧数
+    this.maxLife = this.life;
+    this.width = 4 + Math.random() * 5;
+  }
+  
+  update() {
+    this.life--;
+    this.width *= 0.96;
+  }
+  
+  draw() {
+    const alpha = this.life / this.maxLife;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.shadowColor = '#ff004d';
+    ctx.shadowBlur = 15 * alpha;
+    
+    // 绘制红色剑痕（带渐变）
+    const grd = ctx.createLinearGradient(0, -this.width/2, 120, this.width/2);
+    grd.addColorStop(0, 'rgba(255,20,60,0)');
+    grd.addColorStop(0.2, `rgba(255,40,80,${alpha})`);
+    grd.addColorStop(0.5, `rgba(255,100,140,${alpha*0.7})`);
+    grd.addColorStop(1, 'rgba(255,180,200,0)');
+    
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, -this.width/2, 140 + Math.random()*40, this.width);
+    ctx.restore();
+  }
+}
+
+document.addEventListener('mousemove', e => {
+  const angle = Math.atan2(e.clientY - (lastY||e.clientY), e.clientX - (lastX||e.clientX));
+  
+  if (lastX && Math.hypot(e.clientX-lastX, e.clientY-lastY) > 8) {
+    trails.push(new Trail(e.clientX, e.clientY, angle));
+  }
+  
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+
+function animate() {
+  ctx.fillStyle = 'rgba(0,0,0,0.12)'; // 残影消散速度
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  
+  for (let i = trails.length-1; i >= 0; i--) {
+    const t = trails[i];
+    t.update();
+    t.draw();
+    if (t.life <= 0) trails.splice(i,1);
+  }
+  
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>

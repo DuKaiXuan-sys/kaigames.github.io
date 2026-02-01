@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>红色若隐若现数字雨</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let w, h;
+function resize() {
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// 字符集（可加更多符号增加质感）
+const chars = '01アイウエオカキクケコサシスセソタチツテトナ二ヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789$+-*/=%"#&@'.split('');
+
+// 列数（字体大小决定密度）
+const fontSize = 5;
+const columns = Math.floor(w / fontSize);
+
+// 每列当前下落的y位置
+const drops = new Array(columns).fill(1);
+
+// 每列的“年龄”（用于控制颜色渐变）
+const ages = new Array(columns).fill(0);
+
+function draw() {
+  // 关键：用半透明黑色覆盖，制造拖尾和若隐若现感
+  // 数值越小，尾迹越长（0.02~0.12 之间调）
+  ctx.fillStyle = 'rgba(0,0,0,0.1)';
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.font = `${fontSize}px monospace`;
+
+  for (let i = 0; i < columns; i++) {
+    // 随机字符
+    const text = chars[Math.floor(Math.random() * chars.length)];
+    
+    // 当前下落位置
+    const y = drops[i] * fontSize;
+
+    // 年龄越大颜色越暗（头部亮，尾部暗）
+    ages[i]++;
+    const brightness = Math.max(0.2, 1 - ages[i] * 0.018); // 0.018控制衰减速度
+    
+    // 红色系渐变（头部亮红 → 暗红 → 粉红尾迹）
+    ctx.fillStyle = `rgba(255, ${Math.floor(30 + 100*brightness)}, ${Math.floor(30 + 80*brightness)}, ${brightness})`;
+
+    // 偶尔让头部更亮（像经典矩阵雨的“领头字符”）
+    if (Math.random() > 0.98) {
+      ctx.fillStyle = '#ff4d4d'; // 很亮的红色头部
+      ages[i] = 0; // 重置年龄，制造新亮头
+    }
+
+    ctx.fillText(text, i * fontSize, y);
+
+    // 到达底部后随机高度重置（制造不规则感）
+    if (y > h && Math.random() > 0.975) {
+      drops[i] = 0;
+      ages[i] = 0;
+    }
+
+    drops[i]+=0.6;
+  }
+
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+</body>
+</html>
