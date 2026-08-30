@@ -1,0 +1,231 @@
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vue3 动态列表布局</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 60px 20px;
+            font-family: Arial, sans-serif;
+            background: #fff;
+        }
+
+        /*
+         * 三个列表的外层
+         */
+        .container {
+            width: 100%;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        /*
+         * 每一个列表
+         */
+        .list {
+            position: relative;
+
+            flex: 1;
+
+            display: flex;
+            align-items: center;
+
+            /*
+             * 所有方块之间的间距
+             */
+            gap: 15px;
+
+            /*
+             * 给标题留出空间
+             */
+            padding: 45px 15px 15px;
+
+            border: 1px solid #adadad;
+
+            min-width: 0;
+        }
+
+        /*
+         * 标题
+         *
+         * 悬浮在列表上方偏中间
+         */
+        .title {
+            position: absolute;
+
+            /*
+             * 在列表顶部
+             */
+            top: 10px;
+
+            /*
+             * 水平居中
+             */
+            left: 50%;
+            transform: translateX(-50%);
+
+            padding: 4px 20px;
+
+            background: #fff;
+
+            font-size: 16px;
+            font-weight: bold;
+
+            white-space: nowrap;
+
+            z-index: 10;
+        }
+
+        /*
+         * 方块
+         */
+        .box {
+            /*
+             * 平分当前列表剩余空间
+             */
+            flex: 1;
+
+            /*
+             * 防止内容把方块撑出去
+             */
+            min-width: 0;
+
+            height: 60px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border: 1px solid #333;
+            border-radius: 4px;
+
+            background: #f5f5f5;
+
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="app">
+
+    <div class="container">
+
+        <!-- 左列表 -->
+        <div class="list">
+
+            <div class="title">
+                {{ title1 }}
+            </div>
+
+            <div
+                v-for="item in list1"
+                :key="item.id"
+                class="box"
+            >
+                {{ item.name }}
+            </div>
+
+        </div>
+
+
+        <!-- 中间列表 -->
+        <div class="list">
+
+            <div class="title">
+                {{ title2 }}
+            </div>
+
+            <div
+                v-for="item in list2"
+                :key="item.id"
+                class="box"
+            >
+                {{ item.name }}
+            </div>
+
+        </div>
+
+
+        <!-- 右列表 -->
+        <div class="list">
+
+            <div class="title">
+                {{ title3 }}
+            </div>
+
+            <div
+                v-for="item in list3"
+                :key="item.id"
+                class="box"
+            >
+                {{ item.name }}
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- Vue3 -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+<script>
+
+const { createApp } = Vue;
+
+createApp({
+
+    data() {
+        return {
+
+            title1: '左侧列表',
+            title2: '中间列表',
+            title3: '右侧列表',
+
+            /*
+             * 数量完全可以动态变化
+             */
+            list1: [
+                { id: 1, name: '左 1' },
+                { id: 2, name: '左 2' },
+                { id: 3, name: '左 3' }
+            ],
+
+            list2: [
+                { id: 1, name: '中 1' },
+                { id: 2, name: '中 2' },
+                { id: 3, name: '中 3' },
+                { id: 4, name: '中 4' },
+                { id: 5, name: '中 5' }
+            ],
+
+            list3: [
+                { id: 1, name: '右 1' },
+                { id: 2, name: '右 2' },
+                { id: 3, name: '右 3' },
+                { id: 4, name: '右 4' }
+            ]
+
+        };
+    }
+
+}).mount('#app');
+
+</script>
+
+</body>
+</html>
+```
